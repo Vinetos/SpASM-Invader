@@ -20,7 +20,7 @@ MATRIX 			equ 4 ; Matrice de points
 
 		; Sprites
 		; ------------------------------
-STATE 			equ 0 ; État de l'affichage
+STATE 	   		equ 0 ; État de l'affichage
 X 				equ 2 ; Abscisse
 Y 				equ 4 ; Ordonnée
 BITMAP1 		equ 6 ; Bitmap no 1
@@ -32,11 +32,11 @@ SHOW 			equ 1 ; Afficher le sprite
 
 		; Touches du clavier
  		; ------------------------------
-SPACE_KEY 	equ $420
-LEFT_KEY 	equ $451  ; Q
-UP_KEY 		equ $45A  ; Z
-RIGHT_KEY 	equ $444  ; D
-DOWN_KEY 	equ $453  ; S
+SPACE_KEY 		equ $420
+LEFT_KEY 		equ $441  ;$451 = Q
+UP_KEY 			equ $457  ;$45A = Z
+RIGHT_KEY 		equ $444  ; D
+DOWN_KEY 		equ $453  ; S
 
 ; ==============================
 ; Initialisation des vecteurs
@@ -49,20 +49,20 @@ vector_001 		dc.l 	Main ; Valeur initiale du PC
 ; ==============================
 ; Programme principal
 ; ==============================
- 			org 	$500
+				org 	$500
 
-Main 		; Fait pointer A1.L sur un sprite.
-			lea Invader,a1
+Main 			; Fait pointer A1.L sur un sprite.
+				lea Invader,a1
 
-\loop 		; Affiche le sprite.
-			jsr PrintSprite
-			jsr BufferToScreen
-			; Déplace le sprite en fonction des touches du clavier.
-			jsr MoveSpriteKeyboard
-			; Reboucle.
-			bra \loop
+\loop 			; Affiche le sprite.
+				jsr PrintSprite
+				jsr BufferToScreen
+				; Déplace le sprite en fonction des touches du clavier.
+				jsr MoveSpriteKeyboard
+				; Reboucle.
+				bra \loop
 
-			illegal
+				illegal
 
 
 ; ==============================
@@ -134,7 +134,7 @@ IsOutOfX		move.l	d3,-(a7)			; a0 = adresse du bitmap , d1 = coordonnée x du pix
 IsOutOfY		move.l	d3,-(a7)			; a0 = adresse du bitmap , d2 = coordonnée y du pixel du début du bitmap
 				tst.w	d2
 				bmi		\return_true
-				move.w 	WIDTH(a0),d3
+				move.w 	HEIGHT(a0),d3
 				add.w	d2,d3
 				cmp.w	#VIDEO_HEIGHT,d3
 				bhs		\return_true
@@ -156,8 +156,20 @@ IsOutOfScreen	jsr		IsOutOfX
 \return_true	ori.b	#%00000100,ccr
 				rts
 
+;---------------------------------------
+GetRectangle	;WIDTH, HEIGHT;X, Y
+				move.w	X(a0),d1 		; Coin superieur gauche, abs
+				move.w	Y(a0),d2 		; ord
+				
+				move.w	d1,d3
+				add.w	WIDTH(a0),d3
+				
+				move.w	d2,d4			; Coin superieur gauche, abs
+				add.w	HEIGHT(a0),d4	; ord
+				
+				rts
 ;-----------------------------------------
-CopyLine		movem.l	d1/d2/d4/d5/a1,-(a7)       ; d0 = décallage en pixel , d3 = largeur de la ligne
+CopyLine		movem.l	d1/d2/d4/d5/a1,-(a7)    ; d0 = décallage en pixel , d3 = largeur de la ligne
 
 				move.b	#8,d5
 				sub.b	d0,d5
@@ -210,7 +222,7 @@ CopyBitmap		movem.l	d1/d2/d3/a0/a1,-(a7)
 				movem.l	(a7)+,d1/d2/d3/a0/a1
 				rts
 ;------------------------------------------------------------------------------
-PixelToAdress	movem.l	d1/d2,-(a7)					; d1 = x abscisses du pixel  ,  d2 = y ordonnée du pixel
+PixelToAdress	movem.l	d1/d2,-(a7)		; d1 = x abscisses du pixel  ,  d2 = y ordonnée du pixel
 				mulu.w 	#BYTE_PER_LINE,d2
 				lea		VIDEO_BUFFER,a1
 				adda.w	d2,a1
