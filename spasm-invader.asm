@@ -155,6 +155,58 @@ IsOutOfScreen	jsr		IsOutOfX
 				rts
 \return_true	ori.b	#%00000100,ccr
 				rts
+								
+;----------------------------------------
+IsSpriteColliding
+				; Sauvegarde des registres
+				movem.l	d1/d2/d3/d4,-(a7)
+				
+				; Etat different
+				move.w  STATE(a1),d1
+				cmp.w 	STATE(a2),d1
+				bne		\return_false
+				
+				; Les deux sont hidden
+				cmpi.w 	#0,d1
+				bne		\return_false
+				
+				
+				; GetRectangle de 1
+				movea.l	a1,a0
+				jsr 	GetRectangle
+				movem.l	d1/d2/d3/d4,-(a7)
+				
+				; GetRectangle de 2
+				movea.l	a2,a0
+				jsr 	GetRectangle
+				
+				; Comparaison des coordonnees
+				cmp.w	a7,d2 	;a7 = d4 pour 1
+				bgt 	\return_false; 1 plus bas que 2 en y
+				
+				cmp.w	2(a7),d1	;a7 = d3 pour 1
+				bgt 	\return_false; 1 plus a droite que 2 en x
+				
+				cmp.w	4(a7),d4	;a7 = d2 pour 1
+				blt 	\return_false; 1 plus haut que 2 en y
+				
+				cmp.w	6(a7),d3	;a7 = d1 pour 1
+				blt 	\return_false; 1 plus a gauche que 2 en x
+				
+
+\return_true	; Restauration des registres
+				adda.w	#8,a7
+				movem.l	(a7)+,d1/d2/d3/d4
+				ori.b	#%00000100,ccr
+				rts
+				
+
+\return_false	; Restauration des registres
+				adda	#8,a7
+				movem.l	(a7)+,d1/d2/d3/d4
+				andi.b	#%11111011,ccr
+				rts
+
 
 ;---------------------------------------
 GetRectangle	;WIDTH, HEIGHT;X, Y
@@ -166,6 +218,9 @@ GetRectangle	;WIDTH, HEIGHT;X, Y
 				
 				move.w	d2,d4			; Coin superieur gauche, abs
 				add.w	HEIGHT(a0),d4	; ord
+				
+				sub.w   #1,d3
+				sub.w   #1,d4
 				
 				rts
 ;-----------------------------------------
@@ -200,8 +255,6 @@ PixelToByte		move.l	d2,-(a7)
 				addq.l	#1,d3
 \mult_de8		move.l	(a7)+,d2
 				rts
-			
-			
 
 ;------------------------------------------
 CopyBitmap		movem.l	d1/d2/d3/a0/a1,-(a7)
