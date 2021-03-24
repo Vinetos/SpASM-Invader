@@ -7,7 +7,7 @@
 VIDEO_START 	equ 	$ffb500 ; Adresse de départ
 VIDEO_WIDTH 	equ 	480 ; Largeur en pixels
 VIDEO_HEIGHT 	equ 	320 ; Hauteur en pixels
-VIDEO_SIZE 		equ 	(VIDEO_WIDTH*VIDEO_HEIGHT/8) ; Taille en octets
+VIDEO_SIZE		equ		(VIDEO_WIDTH*VIDEO_HEIGHT/8) ; Taille en octets
 BYTE_PER_LINE 	equ 	(VIDEO_WIDTH/8) ; Nombre d'octets par ligne
 VIDEO_BUFFER 	equ 	(VIDEO_START-VIDEO_SIZE)
 
@@ -41,6 +41,7 @@ DOWN_KEY 		equ $453  ; S
 				; Pas d'incrémentation en pixels
 				; ------------------------------
 SHIP_STEP       equ		4; Pas du vaisseau
+SHIP_SHOT_STEP  equ		4; Pas d'un tir de vaisseau
 
 ; ==============================
 ; Initialisation des vecteurs
@@ -56,9 +57,14 @@ vector_001 		dc.l 	Main ; Valeur initiale du PC
 				org 	$500
 
 Main            jsr     PrintShip
+				jsr     PrintShipShot
 				jsr     BufferToScreen
 				
 				jsr     MoveShip
+				jsr     MoveShipShot
+				
+				jsr     NewShipShot
+				
 				bra     Main
 
 \loop 			; Affiche le sprite.
@@ -154,6 +160,7 @@ IsOutOfY		move.l	d3,-(a7)			; a0 = adresse du bitmap , d2 = coordonnée y du pix
 				rts
 				
 ;----------------------------------------
+				;IsOutOfScreen: No: z = 0, Yes: z = 1
 IsOutOfScreen	jsr		IsOutOfX
 				beq		\return_true
 				jsr		IsOutOfY
@@ -350,14 +357,13 @@ PrintSprite		movem.l	d0/d1/d2/a0,-(a7)
 \quit			movem.l	(a7)+,d0/d1/d2/a0
 				rts
 				
-				
+;-----------------------------------------------------------------------------			
 PrintShip		move.l	a1,-(a7)
 				lea 	Ship,a1
 				jsr		PrintSprite
 				move.l	(a7)+,a1
 				rts
-				
-				
+							
 MoveShip		;a1 = adresse du sprite
 				movem.l	d1/d2/a1,-(a7)
 				lea 	Ship,a1
@@ -376,7 +382,62 @@ MoveShip		;a1 = adresse du sprite
 
 				movem.l	(a7)+,d1/d2/a1
 				rts
+
+;-----------------------------------------------------------------------------			
+PrintShipShot	move.l	a1,-(a7)
+				lea 	ShipShot,a1
+				jsr		PrintSprite
+				move.l	(a7)+,a1
+				rts
 				
+		
+MoveShipShot	;a1 = adresse du sprite				
+				movem.l	d1/d2/a1,-(a7)
+				lea 	ShipShot,a1
+				
+				cmp.w	#SHOW,STATE(a1)
+				bne		\quit
+				
+				clr.w	d1	;déplacement horizontal
+				clr.w	d2	; déplacement vertical
+
+				sub.w	#SHIP_SHOT_STEP,d2
+				
+				jsr		MoveSprite
+				jsr		IsOutOfScreen
+				bne		\quit ; Ne sort pas
+				
+				move.w	#HIDE,STATE(a1)
+				
+
+\quit			movem.l	(a7)+,d1/d2/a1
+				rts
+				
+
+NewShipShot		movem.l	d1/d2/a1/a2,-(a7)
+				lea		ShipShot,a1
+				lea		Ship,a2
+				
+				tst.b	SPACE_KEY
+				bne		\quit
+				
+				cmp.w	#SHOW,STATE(a1)
+				beq		\quit
+				
+				move.w	#SHOW,STATE(a1)
+				; TODO: when calling this, no move fro; ship
+				
+				; H ship dans d2
+				;move.l 	WIDTH(a2),d1
+				;ror.l	#1,d1
+				;move.l 	d1,X(a1)
+				
+				;move.l 	Y(a2),d2
+				;sub.l 	HEIGHT(a2),d2
+				;add.l	d2,Y(a1)
+				
+\quit			;movem.l	(a7)+,d1/d2/a1/a2
+				rts
 
 ; ==============================
 ; Données
@@ -469,6 +530,11 @@ Invader 		dc.w 	SHOW ; Afficher le sprite
 Ship            dc.w    SHOW
 				dc.w	(VIDEO_WIDTH-24)/2,VIDEO_HEIGHT-32
 				dc.l    Ship_Bitmap
+				dc.l	0
+				
+ShipShot        dc.w    HIDE
+				dc.w	0,0
+				dc.l    ShipShot_Bitmap
 				dc.l	0
 				
 MovingSprite    dc.w    SHOW
