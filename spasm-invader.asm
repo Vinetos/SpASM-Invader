@@ -9,7 +9,7 @@ VIDEO_WIDTH 	equ 	480 ; Largeur en pixels
 VIDEO_HEIGHT 	equ 	320 ; Hauteur en pixels
 VIDEO_SIZE 		equ 	(VIDEO_WIDTH*VIDEO_HEIGHT/8) ; Taille en octets
 BYTE_PER_LINE 	equ 	(VIDEO_WIDTH/8) ; Nombre d'octets par ligne
-VIDEO_BUFFER 	equ (VIDEO_START-VIDEO_SIZE)
+VIDEO_BUFFER 	equ 	(VIDEO_START-VIDEO_SIZE)
 
 		; Bitmaps
  		; ------------------------------
@@ -38,6 +38,10 @@ UP_KEY 			equ $457  ;$45A = Z
 RIGHT_KEY 		equ $444  ; D
 DOWN_KEY 		equ $453  ; S
 
+				; Pas d'incrémentation en pixels
+				; ------------------------------
+SHIP_STEP       equ		4; Pas du vaisseau
+
 ; ==============================
 ; Initialisation des vecteurs
 ; ==============================
@@ -51,8 +55,11 @@ vector_001 		dc.l 	Main ; Valeur initiale du PC
 ; ==============================
 				org 	$500
 
-Main 			; Fait pointer A1.L sur un sprite.
-				lea Invader,a1
+Main            jsr     PrintShip
+				jsr     BufferToScreen
+				
+				jsr     MoveShip
+				bra     Main
 
 \loop 			; Affiche le sprite.
 				jsr PrintSprite
@@ -159,69 +166,69 @@ IsOutOfScreen	jsr		IsOutOfX
 ;----------------------------------------
 IsSpriteColliding
 				; Sauvegarde des registres
-				movem.l	d1/d2/d3/d4,-(a7)
+				movem.l	d1-d4/a0,-(a7)
 				
-				; Etat different
-				move.w  STATE(a1),d1
-				cmp.w 	STATE(a2),d1
+				; Pas visible
+				cmp.w	#SHOW,STATE(a1)
 				bne		\return_false
-				
-				; Les deux sont hidden
-				cmpi.w 	#0,d1
+				cmp.w	#SHOW,STATE(a2)
 				bne		\return_false
 				
 				
 				; GetRectangle de 1
 				movea.l	a1,a0
 				jsr 	GetRectangle
-				movem.l	d1/d2/d3/d4,-(a7)
+				movem.l	d1-d4,-(a7)
 				
 				; GetRectangle de 2
 				movea.l	a2,a0
 				jsr 	GetRectangle
 				
 				; Comparaison des coordonnees
-				cmp.w	a7,d2 	;a7 = d4 pour 1
+				cmp.w	4(a7),d1	;a7 = d3 pour 1
+				bgt 	\return_false; 1 plus a droite que 2 en x
+				
+				cmp.w	6(a7),d2 	;a7 = d4 pour 1
 				bgt 	\return_false; 1 plus bas que 2 en y
 				
-				cmp.w	2(a7),d1	;a7 = d3 pour 1
-				bgt 	\return_false; 1 plus a droite que 2 en x
+				cmp.w	(a7),d3	;a7 = d1 pour 1
+				blt 	\return_false; 1 plus a gauche que 2 en x
 				
 				cmp.w	4(a7),d4	;a7 = d2 pour 1
 				blt 	\return_false; 1 plus haut que 2 en y
 				
-				cmp.w	6(a7),d3	;a7 = d1 pour 1
-				blt 	\return_false; 1 plus a gauche que 2 en x
-				
 
 \return_true	; Restauration des registres
 				adda.w	#8,a7
-				movem.l	(a7)+,d1/d2/d3/d4
+				movem.l	(a7)+,d1-d4
 				ori.b	#%00000100,ccr
 				rts
 				
 
 \return_false	; Restauration des registres
 				adda	#8,a7
-				movem.l	(a7)+,d1/d2/d3/d4
+				movem.l	(a7)+,d1-d4
 				andi.b	#%11111011,ccr
 				rts
 
 
 ;---------------------------------------
-GetRectangle	;WIDTH, HEIGHT;X, Y
+GetRectangle	move.l	a0,-(a7)
+				;WIDTH, HEIGHT;X, Y
 				move.w	X(a0),d1 		; Coin superieur gauche, abs
 				move.w	Y(a0),d2 		; ord
 				
+				movea.l BITMAP1(a0),a0
+				
 				move.w	d1,d3
 				add.w	WIDTH(a0),d3
+				sub.w   #1,d3
 				
 				move.w	d2,d4			; Coin superieur gauche, abs
 				add.w	HEIGHT(a0),d4	; ord
-				
-				sub.w   #1,d3
 				sub.w   #1,d4
 				
+				movea.l	(a7)+,a0
 				rts
 ;-----------------------------------------
 CopyLine		movem.l	d1/d2/d4/d5/a1,-(a7)    ; d0 = décallage en pixel , d3 = largeur de la ligne
@@ -330,9 +337,9 @@ BufferToScreen	movem.l	d0/d1/a0/a1,-(a7)
 				
 ;-----------------------------------------------------------------------------
 PrintSprite		movem.l	d0/d1/d2/a0,-(a7)
-				move.w STATE(a1),d0 ; État de l'affichage -> D0.W
- 				move.w X(a1),d1 ; X -> D1.W
- 				move.w Y(a1),d2 ; Y -> D2.W
+				move.w 	STATE(a1),d0 ; État de l'affichage -> D0.W
+ 				move.w 	X(a1),d1 ; X -> D1.W
+ 				move.w 	Y(a1),d2 ; Y -> D2.W
  				movea.l BITMAP1(a1),a0 ; Adresse du bitmap 1 -> A0.L
  				
  				tst.w	d0
@@ -341,6 +348,33 @@ PrintSprite		movem.l	d0/d1/d2/a0,-(a7)
  				jsr		PrintBitmap
 
 \quit			movem.l	(a7)+,d0/d1/d2/a0
+				rts
+				
+				
+PrintShip		move.l	a1,-(a7)
+				lea 	Ship,a1
+				jsr		PrintSprite
+				move.l	(a7)+,a1
+				rts
+				
+				
+MoveShip		;a1 = adresse du sprite
+				movem.l	d1/d2/a1,-(a7)
+				lea 	Ship,a1
+				clr.w	d1	;déplacement horizontal
+				clr.w	d2	; déplacement vertical
+
+\left			tst.b	LEFT_KEY
+				beq		\right
+				sub.w	#SHIP_STEP,d1
+
+\right			tst.b	RIGHT_KEY
+				beq		\mouvement
+				add.w	#SHIP_STEP,d1
+				
+\mouvement		jsr		MoveSprite
+
+				movem.l	(a7)+,d1/d2/a1
 				rts
 				
 
@@ -418,8 +452,26 @@ Ship_Bitmap 	dc.w 24,14
  				dc.b %11111111,%11111111,%11111111
  				dc.b %11111111,%11111111,%11111111
  				dc.b %11111111,%11111111,%11111111
+ 				
+ShipShot_Bitmap dc.w	2,6
+				dc.b	%11000000
+				dc.b	%11000000
+				dc.b	%11000000
+				dc.b	%11000000
+				dc.b	%11000000
+				dc.b	%11000000
 
-Invader 		dc.w SHOW ; Afficher le sprite
- 				dc.w 0,152 ; X = 0, Y = 152
- 				dc.l InvaderA_Bitmap ; Bitmap à afficher
-				dc.l 0 ; Inutilisé
+Invader 		dc.w 	SHOW ; Afficher le sprite
+ 				dc.w 	0,152 ; X = 0, Y = 152
+ 				dc.l 	InvaderA_Bitmap ; Bitmap à afficher
+				dc.l 	0 ; Inutilisé
+				
+Ship            dc.w    SHOW
+				dc.w	(VIDEO_WIDTH-24)/2,VIDEO_HEIGHT-32
+				dc.l    Ship_Bitmap
+				dc.l	0
+				
+MovingSprite    dc.w    SHOW
+				dc.w	0,152
+				dc.l    ShipShot_Bitmap
+				dc.l	0
