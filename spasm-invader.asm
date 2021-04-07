@@ -28,6 +28,8 @@ BITMAP2 		equ 10 ; Bitmap no 2
 HIDE 			equ 0 ; Ne pas afficher le sprite
 SHOW 			equ 1 ; Afficher le sprite
 
+SIZE_OF_SPRITE  equ	14
+
 
 
 		; Touches du clavier
@@ -43,6 +45,12 @@ DOWN_KEY 		equ $453  ; S
 SHIP_STEP       equ		4; Pas du vaisseau
 SHIP_SHOT_STEP  equ		4; Pas d'un tir de vaisseau
 
+; Envahisseurs
+; ------------------------------
+INVADER_PER_LINE	equ	10
+INVADER_PER_COLUMN  equ	5
+INVADER_COUNT       equ     INVADER_PER_LINE*INVADER_PER_COLUMN
+
 ; ==============================
 ; Initialisation des vecteurs
 ; ==============================
@@ -56,8 +64,11 @@ vector_001 		dc.l 	Main ; Valeur initiale du PC
 ; ==============================
 				org 	$500
 
-Main            jsr     PrintShip
+Main            jsr 	InitInvaders
+				
+\loop           jsr     PrintShip
 				jsr     PrintShipShot
+				jsr     PrintInvaders
 				jsr     BufferToScreen
 				
 				jsr     MoveShip
@@ -65,15 +76,7 @@ Main            jsr     PrintShip
 				
 				jsr     NewShipShot
 				
-				bra     Main
-
-\loop 			; Affiche le sprite.
-				jsr PrintSprite
-				jsr BufferToScreen
-				; Déplace le sprite en fonction des touches du clavier.
-				jsr MoveSpriteKeyboard
-				; Reboucle.
-				bra \loop
+				bra		\loop
 
 				illegal
 
@@ -390,6 +393,7 @@ PrintShipShot	move.l	a1,-(a7)
 				move.l	(a7)+,a1
 				rts
 				
+;-----------------------------------------------------------------------------			
 		
 MoveShipShot	;a1 = adresse du sprite				
 				movem.l	d1/d2/a1,-(a7)
@@ -413,7 +417,7 @@ MoveShipShot	;a1 = adresse du sprite
 \quit			movem.l	(a7)+,d1/d2/a1
 				rts
 				
-
+;-----------------------------------------------------------------------------
 NewShipShot		movem.l	d1/d2/a1/a2,-(a7)
 				lea		ShipShot,a1
 				lea		Ship,a2
@@ -437,6 +441,95 @@ NewShipShot		movem.l	d1/d2/a1/a2,-(a7)
 				;add.l	d2,Y(a1)
 				
 \quit			;movem.l	(a7)+,d1/d2/a1/a2
+				rts
+
+InitInvaderLine     ; Sauvegarde les registres.
+				movem.l	d1-d3/d7/a0,-(a7)
+				
+				; Nombre d'itérations = Nombre d'envahisseurs par ligne
+				; Nombre d'itérations - 1 (car DBRA) -> D7.W
+				move.w	#INVADER_PER_LINE-1,d7
+				
+				; Modifie l'abscisse de départ de la ligne
+				; afin de centrer le sprite sur une largeur de 32 pixels.
+				; D1.W += (32 - Largeur du sprite) / 2
+				move.w	#32,d3
+				sub.w   WIDTH(a1),d3
+				lsr.w	#1,d3
+				add.w	d3,d1
+				
+\loop           ; Initialise tous les champs du sprite.
+				move.w	#SHOW,STATE(a0)
+				move.w	d1,X(a0)
+				move.w	d2,Y(a0)
+				move.l	a1,BITMAP1(a0)
+				move.l	a2,BITMAP2(a0)
+				
+				; Passe à l'envahisseur suivant.
+				adda.l	#SIZE_OF_SPRITE,a0
+				addi.w	#32,d1
+				dbra	d7,\loop
+				
+				; Restaure les registres puis sortie.
+				movem.l	(a7)+,d1-d3/d7/a0
+				rts
+				
+InitInvaders    ; Sauvegarde les registres.
+				movem.l	d1/d2/a0-a2,-(a7)
+				
+				; 1re ligne d'envahisseurs.
+				move.w  InvaderX,d1
+				move.w  InvaderY,d2
+				lea     Invaders,a0
+				lea     InvaderC_Bitmap,a1
+				lea		0,a2
+				jsr     InitInvaderLine
+				
+				; 2e ligne d'envahisseurs.
+				add.w	#32,d2
+				adda.l	#SIZE_OF_SPRITE*INVADER_PER_LINE,a0
+				lea     InvaderB_Bitmap,a1
+				jsr     InitInvaderLine
+				
+				; 3e ligne d'envahisseurs.
+				add.w	#32,d2
+				adda.l	#SIZE_OF_SPRITE*INVADER_PER_LINE,a0
+				jsr     InitInvaderLine
+				
+				; 4e ligne d'envahisseurs.
+				add.w	#32,d2
+				adda.l	#SIZE_OF_SPRITE*INVADER_PER_LINE,a0
+				lea     InvaderA_Bitmap,a1
+				jsr     InitInvaderLine
+				
+				; 5e ligne d'envahisseurs.
+				add.w	#32,d2
+				adda.l	#SIZE_OF_SPRITE*INVADER_PER_LINE,a0
+				jsr     InitInvaderLine
+				
+				; Restaure les registres puis sortie.
+				movem.l	(a7)+,d1/d2/a0-a2
+				rts
+				
+
+PrintInvaders   ; Sauvegarde les registres.
+				movem.l	d7/a1,-(a7)
+				
+				; Nombre d'itérations = Nombre d'envahisseurs
+				; Nombre d'itérations - 1 (car DBRA) -> D7.W
+				move.w	#INVADER_COUNT-1,d7
+				; Adresse de départ des sprites -> A1.L
+				lea     Invaders,a1
+
+\loop       	; Affiche un envahisseur.
+				jsr     PrintSprite
+				
+				; Passe au prochain envahisseur et reboucle.
+				adda.l	#SIZE_OF_SPRITE,a1
+				dbra	d7,\loop
+				
+				; Sauvegarde les registres puis sortie.
+				movem.l	(a7)+,d7/a1
 				rts
 
 ; ==============================
@@ -487,7 +580,7 @@ InvaderC_Bitmap dc.w 16,16
  				dc.b %00001111,%11110000
  				dc.b %00111111,%11111100
  				dc.b %00111111,%11111100
- 				dc.b %11110011,%11001111
+				dc.b %11110011,%11001111
  				dc.b %11110011,%11001111
  				dc.b %11111111,%11111111
  				dc.b %11111111,%11111111
@@ -541,3 +634,8 @@ MovingSprite    dc.w    SHOW
 				dc.w	0,152
 				dc.l    ShipShot_Bitmap
 				dc.l	0
+				
+Invaders        ds.b    INVADER_COUNT*SIZE_OF_SPRITE
+
+InvaderX        dc.w	(VIDEO_WIDTH-(INVADER_PER_LINE*32))/2; Abscisse globale
+InvaderY        dc.w	32; Ordonnée globale
