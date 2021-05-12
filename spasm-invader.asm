@@ -86,12 +86,27 @@ Main 		jsr InitInvaders
 		jsr MoveShipShot
 
 		jsr NewShipShot
+		jsr SpeedInvaderUp
 
 		bra \loop
 
 ; ==============================
 ; Sous-programmes
 ; ==============================
+SpeedInvaderUp  movem.l d0/a0,-(a7)
+
+                clr.w   InvaderSpeed
+                move.w  InvaderCount,d0
+                lea     SpeedLevels,a0
+
+\loop           addq.w  #1,InvaderSpeed
+
+                cmp.w   (a0)+,d0
+                bhi     \loop
+
+                movem.l (a7)+,d0/a0
+                rts
+
 
 DestroyInvaders movem.l	d0/a1-a2,-(a7)
 
@@ -128,7 +143,7 @@ SwapBitmap	;a1 = adresse du sprite ou il faut inverser Bitmap1 et 2
 MoveInvaders	movem.l	d0/a0,-(a7)
 		lea	Cpt_MoveInvaders,a0
 		move.w	(a0),d0
-		cmp.w	#8,d0
+		cmp.w	InvaderSpeed,d0
 		beq	\mvt
 		add.w	#1,d0
 		bra	\quit
@@ -328,13 +343,13 @@ MoveShip	movem.l	d1/d2/a1,-(a7)
 		clr.w	d1	;déplacement horizontal
 		clr.w	d2	;déplacement vertical = 0 obligatoirement
 \left		tst.b	LEFT_KEY
-		beq		\right
+		beq	\right
 		sub.w	#SHIP_STEP,d1
 
 \right		tst.b	RIGHT_KEY
-		beq		\mouvement
+		beq	\mouvement
 		add.b	#SHIP_STEP,d1
-\mouvement	jsr		MoveSprite
+\mouvement	jsr	MoveSprite
 
 		movem.l	(a7)+,d1/d2/a1
                 rts
@@ -425,20 +440,20 @@ MoveSpriteKeyboard						;a1 = adresse du sprite
 			clr.w	d2	; déplacement vertical
 
 \up			tst.b	UP_KEY
-			beq		\down
+			beq	\down
 			sub.w	#1,d2
 \down			tst.b	DOWN_KEY
-			beq		\left
+			beq	\left
 			add.w	#1,d2
 
 \left			tst.b	LEFT_KEY
-			beq		\right
+			beq	\right
 			sub.w	#1,d1
 
 \right			tst.b	RIGHT_KEY
-			beq		\mouvement
+			beq	\mouvement
 			add.b	#1,d1
-\mouvement		jsr		MoveSprite
+\mouvement		jsr	MoveSprite
 
 			movem.l	(a7)+,d1/d2
 			rts
@@ -446,31 +461,31 @@ MoveSpriteKeyboard						;a1 = adresse du sprite
 ;----------------------------------------------
 
 MoveSprite 	; a1 = adresse du sprite , d1 = déplacement horizontal	, d2 = déplacement vertical
- 		movem.l d1/d2/a0,-(a7)
+ 		movem.l  d1/d2/a0,-(a7)
 
 		; Le déplacement fait il sortir le Sprite de l'écran ?
-		add.w X(a1),d1
- 		add.w Y(a1),d2
-		movea.l BITMAP1(a1),a0
-		jsr IsOutOfScreen
-		beq \false
+		add.w    X(a1),d1
+ 		add.w    Y(a1),d2
+		movea.l  BITMAP1(a1),a0
+		jsr      IsOutOfScreen
+		beq      \false
  		; Si ca reste dans l'écran, on modifie les coordonées du sprite + Z =1
-		move.w d1,X(a1)
- 		move.w d2,Y(a1)
- 		ori.b #%00000100,ccr
- 		bra \quit
+		move.w   d1,X(a1)
+ 		move.w   d2,Y(a1)
+ 		ori.b    #%00000100,ccr
+ 		bra      \quit
 \false 		; Si ca sort de l'écran, on ne modifie rien + Z = 0
- 		andi.b #%11111011,ccr
-\quit 		movem.l (a7)+,d1/d2/a0
+ 		andi.b   #%11111011,ccr
+\quit 		movem.l  (a7)+,d1/d2/a0
  		rts
 ;----------------------------------------
 IsOutOfX	move.l	d3,-(a7)			; a0 = adresse du bitmap , d1 = coordonnée x du pixel du début du bitmap
 		tst.w	d1
-		bmi		\return_true
+		bmi	\return_true
 		move.w 	WIDTH(a0),d3
 		add.w	d1,d3
 		cmp.w	#VIDEO_WIDTH,d3
-		bhs		\return_true
+		bhs	\return_true
 \return_false	move.l	(a7)+,d3
 		andi.b	#%11111011,ccr
 		rts
@@ -481,11 +496,11 @@ IsOutOfX	move.l	d3,-(a7)			; a0 = adresse du bitmap , d1 = coordonnée x du pixel
 ;-----------------------------------------
 IsOutOfY	move.l	d3,-(a7)			; a0 = adresse du bitmap , d2 = coordonnée y du pixel du début du bitmap
 		tst.w	d2
-		bmi		\return_true
+		bmi	\return_true
 		move.w 	HEIGHT(a0),d3
 		add.w	d2,d3
 		cmp.w	#VIDEO_HEIGHT,d3
-		bhs		\return_true
+		bhs	\return_true
 \return_false	move.l	(a7)+,d3
 		andi.b	#%11111011,ccr
 		rts
@@ -495,10 +510,10 @@ IsOutOfY	move.l	d3,-(a7)			; a0 = adresse du bitmap , d2 = coordonnée y du pixel
 		rts
 
 ;----------------------------------------
-IsOutOfScreen	jsr		IsOutOfX
-		beq		\return_true
-		jsr		IsOutOfY
-		beq		\return_true
+IsOutOfScreen	jsr	IsOutOfX
+		beq	\return_true
+		jsr	IsOutOfY
+		beq	\return_true
 \return_false	andi.b	#%11111011,ccr
 		rts
 \return_true	ori.b	#%00000100,ccr
@@ -516,12 +531,11 @@ CopyLine	movem.l	d1/d2/d4/d5/a1,-(a7)       ; d0 = décallage en pixel , d3 = lar
 		lsr.b	d0,d4					; d4 = octet de gauche
 		lsl.b	d5,d2					; d2 = octet de droite
 
-
 		or.b	d4,(a1)+
 		or.b	d2,(a1)
 
 		cmp.l	d3,d1
-		bne		\loop
+		bne	\loop
 		movem.l	(a7)+,d1/d2/d4/d5/a1
 		rts
 
@@ -532,7 +546,7 @@ PixelToByte	move.l	d2,-(a7)
 		move.l	d3,d2
 		lsr.l	#3,d3
 		andi.l	#$00000007,d2
-		beq		\mult_de8
+		beq	\mult_de8
 		addq.l	#1,d3
 \mult_de8	move.l	(a7)+,d2
 		rts
@@ -542,25 +556,25 @@ PixelToByte	move.l	d2,-(a7)
 ;------------------------------------------
 CopyBitmap	movem.l	d1/d2/d3/a0/a1,-(a7)
 		move.w 	WIDTH(a0),d3 ; d3 = largeur du bitmap en pixel
-		jsr		PixelToByte  ; d3 = largeur du bitmap en octet
+		jsr	PixelToByte  ; d3 = largeur du bitmap en octet
 
  		move.w 	HEIGHT(a0),d1 ; D1 = hauteur du bitmap
  		clr.l	d2			  ; d2 servira de compteur de boucle
 
-		lea		MATRIX(a0),a0 ; a0 pointe sur le premier octet du bitmap
+		lea	MATRIX(a0),a0 ; a0 pointe sur le premier octet du bitmap
 
 \loop		addq.w	#1,d2
-		jsr		CopyLine
+		jsr	CopyLine
 		adda.l	#BYTE_PER_LINE,a1
 
 		cmp.w	d2,d1
-		bne		\loop
+		bne	\loop
 		movem.l	(a7)+,d1/d2/d3/a0/a1
 		rts
 ;------------------------------------------------------------------------------
 PixelToAdress	movem.l	d1/d2,-(a7)					; d1 = x abscisses du pixel  ,  d2 = y ordonnée du pixel
 		mulu.w 	#BYTE_PER_LINE,d2
-		lea		VIDEO_BUFFER,a1
+		lea	VIDEO_BUFFER,a1
 		adda.w	d2,a1
 		move.w	d1,d2
 		lsr.w	#3,d1
@@ -571,8 +585,8 @@ PixelToAdress	movem.l	d1/d2,-(a7)					; d1 = x abscisses du pixel  ,  d2 = y ord
 		rts
 ;--------------------------------------------------------------------------
 PrintBitmap	movem.l d0/a1,-(a7)
-		jsr		PixelToAdress
-		jsr		CopyBitmap
+		jsr	PixelToAdress
+		jsr	CopyBitmap
 		movem.l (a7)+,d0/a1
 		rts
 ;----------------------------------------------------------------------------
@@ -583,7 +597,7 @@ FillScreen	movem.l	a0/a1,-(a7)
 \loop
  		move.l	d0,(a0)+
  		cmp.l	a1,a0
- 		bne		\loop
+ 		bne	\loop
 
  		movem.l	(a7)+,a0/a1
  		rts
@@ -591,7 +605,7 @@ FillScreen	movem.l	a0/a1,-(a7)
 ;----------------------------------------------------------------------------
 ClearScreen	move.l	d0,-(a7)
 		move.l	#$00000000,d0
-		jsr		FillScreen
+		jsr	FillScreen
 		move.l	(a7)+,d0
 		rts
 
@@ -606,7 +620,7 @@ BufferToScreen	movem.l	d0/d1/a0/a1,-(a7)
 		move.l	(a1),(a0)+
 		move.l	#0,(a1)+
 		cmp.l	d0,d1
-		bne		\loop
+		bne	\loop
 		movem.l	(a7)+,d0/d1/a0/a1
 		rts
 
@@ -619,9 +633,9 @@ PrintSprite	movem.l	d0/d1/d2/a0,-(a7)
  		movea.l BITMAP1(a1),a0 ; Adresse du bitmap 1 -> A0.L
 
  		tst.w	d0
- 		beq		\quit
+ 		beq	\quit
 
- 		jsr		PrintBitmap
+ 		jsr	PrintBitmap
 
 \quit		movem.l	(a7)+,d0/d1/d2/a0
 		rts
@@ -783,7 +797,9 @@ ShipShot 	dc.w HIDE
 InvaderX 		dc.w (VIDEO_WIDTH-(INVADER_PER_LINE*32))/2 ; Abscisse globale
 InvaderY 		dc.w 32					   ; Ordonnée globale
 InvaderCurrentStep      dc.w INVADER_STEP_X		           ; Pas en cours
-InvaderCount            dc.w INVADER_COUNT
+InvaderCount            dc.w INVADER_COUNT                         ; Nombre d'invaders (sans blague ! )
+InvaderSpeed            dc.w 8                                     ; FAST
+SpeedLevels             dc.w 1,5,10,15,20,25,35,50
 
 Invaders 		ds.b INVADER_COUNT*SIZE_OF_SPRITE
 
